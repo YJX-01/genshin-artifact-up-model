@@ -96,7 +96,7 @@ class ArtClassifier(object):
         self.artifact_finish: Sequence[Tuple[int, Art]] = []
         self.artifact_abandon: Sequence[Tuple[int, int, Art]] = []
         # in the training data use last digit as classifier digit, so len(array) = 11
-        # below is training data and optimal w* for SVM
+        # below is training data and optimal w* for logistic regression classifier
         self.training_data: Mapping[str,
                                     Mapping[str, Sequence[Sequence[int]]]] = {}
         self.w = {}
@@ -237,7 +237,7 @@ class ArtClassifier(object):
 
     def train(self, train_data: Sequence[Sequence[int]]):
         '''
-        train a SVM from training data\n
+        train a logistic regression classifier from training data\n
         \treturn: np.array
         '''
         X = []
@@ -293,7 +293,7 @@ class ArtClassifier(object):
             print('training data missing')
             return
 
-        # train SVM
+        # train logistic regression classifier
         self.w = dict.fromkeys(self.__positions)
         for pos, pos_v in self.training_data.items():
             self.w[pos] = {}
@@ -413,7 +413,7 @@ if __name__ == '__main__':
 
     sim.set_output()
 
-    # use SVM to train classifier
+    # use data to train classifier
     sim.train_data_input('./data/training_data1.json')
     sim.start_training()
     sim.w_data_output('./data/optimal_w_train.json')
