@@ -1,0 +1,47 @@
+{
+    "main": {
+        "flower": { "HP": 1000 },
+        "plume": { "ATK": 1000 },
+        "sands": {
+            "HP_P": 1334,
+            "ATK_P": 1333,
+            "DEF_P": 1333,
+            "ER": 500,
+            "EM": 500
+        },
+        "goblet": {
+            "HP_P": 850,
+            "ATK_P": 850,
+            "DEF_P": 800,
+            "PRYO_DMG": 200,
+            "ELECTRO_DMG": 200,
+            "CRYO_DMG": 200,
+            "HYDRO_DMG": 200,
+            "ANEMO_DMG": 200,
+            "GEO_DMG": 200,
+            "PHYSICAL_DMG": 200,
+            "EM": 100
+        },
+        "circlet": {
+            "HP_P": 1100,
+            "ATK_P": 1100,
+            "DEF_P": 1100,
+            "CR": 500,
+            "CD": 500,
+            "HEAL_BONUS": 500,
+            "EM": 200
+        }
+    },
+    "sub": {
+        "ATK": 150,
+        "ATK_P": 100,
+        "DEF": 150,
+        "DEF_P": 100,
+        "HP": 150,
+        "HP_P": 100,
+        "ER": 100,
+        "EM": 100,
+        "CR": 75,
+        "CD": 75
+    }
+}
