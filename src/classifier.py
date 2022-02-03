@@ -9,12 +9,15 @@ class Art(object):
     __subs = ['ATK', 'ATK_P', 'DEF', 'DEF_P',
               'HP', 'HP_P', 'ER', 'EM', 'CR', 'CD']
 
+    with open('./doc/distribution.json', 'r') as f:
+        js = json.load(f)
+        __distribution_sub: Dict[str, int] = js['sub']
+
     def __init__(self) -> None:
         for s in self.__subs:
             self.__setattr__(s, 0)
         self.pos = ''
-        # default target set is 0
-        self.sets = -1
+        self.sets = -1  # default target set is 0
         self.main = ''
 
     def set_dict(self, in_dict: dict):
@@ -27,7 +30,9 @@ class Art(object):
     def to_array(self):
         return np.array([self.__getattribute__(s) for s in self.__subs])
 
-    def generate(self, main: str, sets: int,  pos: str, p_dict: dict):
+    def generate(self, main: str, sets: int,  pos: str):
+        p_dict = self.__distribution_sub.copy()
+        p_dict.pop(main, None)
         stat_key = list(p_dict.keys())
         weight = list(p_dict.values())
         init_num = 3+int(random.random() <= 0.2)
@@ -44,9 +49,10 @@ class Art(object):
         exist_stat = [k for k, v in self.__dict__.items()
                       if v and k != 'main' and k != 'pos' and k != 'sets']
         if len(exist_stat) == 3:
-            remain_stat = [s for s in self.__subs
-                           if s not in exist_stat and s != self.main]
-            upgrade_stat = random.choice(remain_stat)
+            p_dict = self.__distribution_sub.copy()
+            list(map(lambda x: p_dict.pop(x, None), exist_stat+[self.main]))
+            upgrade_stat = random.choices(
+                list(p_dict.keys()), list(p_dict.values()))[0]
         else:
             upgrade_stat = random.choice(exist_stat)
         self.__dict__[upgrade_stat] += 1
@@ -79,7 +85,8 @@ class Art(object):
 
 class ArtClassifier(object):
     '''
-    you should set <main stat>, <stat criterion>, and <stop criterion>\n
+    you should set <main stat>, <target stat>, and <stop criterion>\n
+    also input the data of classifiers <w>\n
     then start simulation\n
     '''
     __subs = ['ATK', 'ATK_P', 'DEF', 'DEF_P',
@@ -90,7 +97,6 @@ class ArtClassifier(object):
     with open('./doc/distribution.json', 'r') as f:
         js = json.load(f)
         __distribution_main: Dict[str, Dict[str, int]] = js['main']
-        __distribution_sub: Dict[str, int] = js['sub']
 
     def __init__(self) -> None:
         self.artifact_finish: Sequence[Tuple[int, Art]] = []
@@ -99,13 +105,12 @@ class ArtClassifier(object):
         # below is training data and optimal w* for logistic regression classifier
         self.training_data: Mapping[str,
                                     Mapping[str, Sequence[Sequence[int]]]] = {}
-        self.w = {}
+        self.w: Dict[str, Sequence] = {}
         # below is you need to set
-        self.main_stat = {}
-        self.target_stat = []
-        self.ignore_stat = []
-        self.stop_criterion = None
-        self.output_mode = False
+        self.main_stat: Dict[str, str] = {}
+        self.target_stat: Sequence[str] = []
+        self.stop_criterion: Callable = None
+        self.output_mode: bool = False
 
     def set_main_stat(self, main_stat: Mapping[str, str]):
         '''
@@ -114,14 +119,12 @@ class ArtClassifier(object):
         '''
         self.main_stat = main_stat
 
-    def set_stat_criterion(self, target: Sequence[str]):
+    def set_target_stat(self, target: Sequence[str]):
         '''
         set target sub stat\n
         \ttarget: List[str]
         '''
         self.target_stat = target
-        self.ignore_stat = [s for s in self.__subs
-                            if s not in self.target_stat]
 
     def set_stop_criterion(self, f: Callable[[Any], bool]):
         '''
@@ -152,9 +155,9 @@ class ArtClassifier(object):
         def evaluate_artifact(a: Art) -> float:
             if not a:
                 return 0
-            v_a = a.to_array()
-            v_w = np.array([0.2, 0.6, 0, 0, 0, 0, 0, 0, 1, 1])
-            return np.matmul(v_a, v_w)
+            v_a = a.to_list()
+            v_w = [0.2, 0.6, 0, 0, 0, 0, 0.1, 0, 1, 1]
+            return sum(map(lambda x, y: x*y, v_w, v_a))
 
         def find_max_set1(stat_list: list, top_dict: dict) -> str:
             max_stat = ('', 0)
@@ -316,12 +319,8 @@ class ArtClassifier(object):
                               list(main_dis.values()), k=1)[0]
         sets = random.randint(0, 1)
 
-        # generate sub stat
-        sub_dis: Dict[str, int] = self.__distribution_sub.copy()
-        sub_dis.pop(main, None)
-
         sample = Art()
-        sample.generate(main, sets, position, sub_dis)
+        sample.generate(main, sets, position)
         return sample
 
     def start_simulation(self, max_times: int = 1000):
@@ -348,8 +347,8 @@ class ArtClassifier(object):
             stat_now = sum([v for k, v in sample.__dict__.items()
                             if k in self.__subs])
             upgrade_time = 0
-            upgrade_flag = np.matmul(np.append(sample.to_array(), [1]),
-                                     self.w[sample.pos][str(stat_now)])
+            upgrade_flag = sum(map(lambda x, y: x*y, sample.to_list()+[1],
+                                   self.w[sample.pos][str(stat_now)]))
 
             # if main stat doesn't match, abandon.
             # if set doesn't match and not in 'sands', 'goblet', 'circlet', abandon
@@ -368,8 +367,8 @@ class ArtClassifier(object):
                 upgrade_time += 1
                 if upgrade_time == 5:
                     break
-                upgrade_flag = np.matmul(np.append(sample.to_array(), [1]),
-                                         self.w[sample.pos][str(stat_now)])
+                upgrade_flag = sum(map(lambda x, y: x*y, sample.to_list()+[1],
+                                   self.w[sample.pos][str(stat_now)]))
 
             if self.output_mode:
                 print(f'upgrade stop at {upgrade_time} times')
@@ -408,7 +407,7 @@ if __name__ == '__main__':
     sim = ArtClassifier()
     sim.set_main_stat(dict(zip(['flower', 'plume', 'sands', 'goblet', 'circlet'],
                                ['HP', 'ATK', 'ER', 'ELECTRO_DMG', 'CR'])))
-    sim.set_stat_criterion(['CD', 'CR', 'ATK_P'])
+    sim.set_target_stat(['CD', 'CR', 'ATK_P'])
     sim.set_stop_criterion(stopping)
 
     sim.set_output()
@@ -419,9 +418,8 @@ if __name__ == '__main__':
     sim.w_data_output('./data/optimal_w_train.json')
 
     # # get classifier directly
-    # sim.w_data_input('./data/optimal_w.json')
+    sim.w_data_input('./data/optimal_w.json')
 
-    # # sim.set_output(False)
-    # for i in range(1):
-    #     sim.start_simulation()
-    #     sim.clear_result()
+    for i in range(10):
+        sim.start_simulation()
+        sim.clear_result()

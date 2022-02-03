@@ -1,4 +1,3 @@
-import json
 from typing import Dict, List
 import numpy as np
 import matplotlib.pyplot as plt
@@ -12,9 +11,9 @@ __positions = ['flower', 'plume', 'sands', 'goblet', 'circlet']
 def evaluate_artifact(a: Art) -> float:
     if not a:
         return 0
-    v_a = a.to_array()
-    v_w = np.array([0.2, 0.6, 0, 0, 0, 0, 0, 0, 1, 1])
-    return np.matmul(v_a, v_w)
+    v_a = a.to_list()
+    v_w = [0.2, 0.6, 0, 0, 0, 0, 0.1, 0, 1, 1]
+    return sum(map(lambda x, y: x*y, v_w, v_a))
 
 
 def get_max_combinations(artifact_finish: List[Tuple]):
@@ -47,6 +46,50 @@ def get_max_combinations(artifact_finish: List[Tuple]):
     if max_stat[0]:
         result_artifact[max_stat[0]] = top_for_each_set[max_stat[0]][1]
     return result_artifact
+
+
+def get_data_from_recorder(recorder: List[Tuple[List, List]], data_name: str):
+    '''
+    data_name choice:\n
+    \tfinish: the artifact that finish upgrade\n
+    \thalf: the artifact that is abandoned halfway\n
+    \tinit: the artifact that is initially abandoned\n
+    \tabandon: the artifact that is abandoned\n
+    \tvalue: the value of max-value artifact combination using evaluate_artifact()\n
+    \tcomplete: the time that complete rolling a 4-piece set\n
+    \tlast: the time that upgrade the last artifact\n
+    '''
+    if data_name == 'finish':
+        return [len(d[0]) for d in recorder]
+    elif data_name == 'half':
+        return [sum(1 for h in d[1] if 0 < h[1] < 5) for d in recorder]
+    elif data_name == 'init':
+        return [sum(1 for h in d[1] if 0 == h[1]) for d in recorder]
+    elif data_name == 'abandon':
+        return [len(d[1]) for d in recorder]
+    elif data_name == 'value':
+        max_value = []
+        for d in recorder:
+            max_comb = get_max_combinations(d[0])
+            max_v = sum([evaluate_artifact(a) for a in max_comb.values()])
+            max_value.append(max_v)
+        return max_value
+    elif data_name == 'complete':
+        complete_set = []
+        for d in recorder:
+            for index in range(len(d[0])):
+                result_artifact = get_max_combinations(d[0][:index+1])
+                if all(result_artifact.values()):
+                    complete_set.append(d[0][index][0])
+                    break
+                if index == len(d[0])-1:
+                    complete_set.append(d[0][-1][0])
+                    break
+        return complete_set
+    elif data_name == 'last':
+        return [d[0][-1][0] for d in recorder]
+    else:
+        return
 
 
 def view_stack_plot_for_one(sim: ArtClassifier):
@@ -118,52 +161,100 @@ def view_step_plot_for_one(sim: ArtClassifier):
     plt.show()
 
 
-def view_stack_plot():
-    return
+def view_value_growth(recorder: List[Tuple[List, List]], length: int = 1000):
+    '''
+    length should be no greater than simulation max times
+    '''
+    x: List[int] = np.arange(1, length+1, 1)
+    y: List[float] = np.zeros(length)
+
+    for d in recorder:
+        tmp_y = [0]
+        for index in range(len(d[0])):
+            get_time = d[0][index][0]
+            for j in range(get_time-len(tmp_y)):
+                tmp_y.append(tmp_y[-1])
+            result_artifact = get_max_combinations(d[0][:index+1])
+            value = sum([evaluate_artifact(a)
+                        for a in result_artifact.values()])
+            tmp_y[-1] = value
+        for _ in range(length-len(tmp_y)):
+            tmp_y.append(tmp_y[-1])
+        for i in range(length):
+            y[i] += tmp_y[i]
+
+    y /= len(recorder)
+
+    plt.plot(x, y)
+    plt.grid(axis='both')
+    plt.title('value growth curve')
+    plt.xlabel('times')
+    plt.ylabel('stat value')
+    plt.show()
 
 
-def view_step_plot():
-    return
+def view_stack_plot(recorder: List[Tuple[List, List]], length: int, target_stat: List[str]):
+    x: List[int] = np.arange(1, length+1, 1)
+    y: Dict[str, List[int]] = {}
+    for k in (target_stat+['OTHER']):
+        y[k] = np.zeros(length)
+
+    for d in recorder:
+        tmp_y = [dict.fromkeys(target_stat+['OTHER'], 0)]
+        for index in range(len(d[0])):
+            get_time = d[0][index][0]
+            for j in range(get_time-len(tmp_y)):
+                tmp_y.append(tmp_y[-1])
+            result_artifact = get_max_combinations(d[0][:index+1])
+            stack_data = dict.fromkeys(target_stat+['OTHER'], 0)
+            for a in result_artifact.values():
+                if not a:
+                    continue
+                for k, v in a.__dict__.items():
+                    if k in target_stat:
+                        stack_data[k] += v
+                    elif k in __subs:
+                        stack_data['OTHER'] += v
+            tmp_y[-1] = stack_data
+        for _ in range(length-len(tmp_y)):
+            tmp_y.append(tmp_y[-1])
+        for i in range(length):
+            for k in target_stat+['OTHER']:
+                y[k][i] += tmp_y[i][k]
+
+    for v in y.values():
+        v /= len(recorder)
+
+    fig, ax = plt.subplots()
+    ax.stackplot(x, y.values(), labels=y.keys(), alpha=0.7)
+    ax.set_yticks(np.linspace(0, 46, 24))
+    ax.set_xlim(0, length)
+    ax.yaxis.grid(True)
+    ax.set_title('stack plot')
+    ax.set_xlabel('times')
+    ax.set_ylabel('stat num')
+    ax.legend(loc='upper left')
+    plt.show()
 
 
 def view_scatter_plot(recorder: List[Tuple[List, List]], x: str = 'finish', y: str = 'abandon'):
     '''
     plot the relationship between x and y using scatter plot\n
-    \trecoder: List[Tuple[List, List]] = a list that contain [(artifact_finish, artifact_abandon)]\n
-    \tx = ['finish'|'half'|'init'|'abandon']\n
-    \ty = ['finish'|'half'|'init'|'abandon']\n
-    finish: the artifact that finish upgrade\n
-    half: the artifact that is abandoned halfway\n
-    init: the artifact that is initially abandoned\n
-    abandon: the artifact that is abandoned
+    \t\trecoder: List[Tuple[List, List]] = a list that contain [(artifact_finish, artifact_abandon)]\n
+    \t\tx = ['finish'|'half'|'init'|'abandon'|'value'|'complete'|'last']\n
+    \t\ty = ['finish'|'half'|'init'|'abandon'|'value'|'complete'|'last']\n
+    \tfinish: the artifact that finish upgrade\n
+    \thalf: the artifact that is abandoned halfway\n
+    \tinit: the artifact that is initially abandoned\n
+    \tabandon: the artifact that is abandoned\n
+    \tvalue: the value of max-value artifact combination using evaluate_artifact()\n
+    \tcomplete: the time that complete rolling a 4-piece set\n
+    \tlast: the time that upgrade the last artifact\n
     '''
-    if x == 'finish':
-        x_data = [len(d[0]) for d in recorder]
-    elif x == 'half':
-        x_data = [sum(1 for h in d[1] if 0 < h[1] < 5) for d in recorder]
-    elif x == 'init':
-        x_data = [sum(1 for h in d[1] if 0 == h[1]) for d in recorder]
-    elif x == 'abandon':
-        x_data = [len(d[1]) for d in recorder]
-    else:
-        return
+    x_data = get_data_from_recorder(recorder, x)
+    y_data = get_data_from_recorder(recorder, y)
+    max_value = get_data_from_recorder(recorder, 'value')
 
-    if y == 'finish':
-        y_data = [len(d[0]) for d in recorder]
-    elif y == 'half':
-        y_data = [sum(1 for h in d[1] if 0 < h[1] < 5) for d in recorder]
-    elif y == 'init':
-        y_data = [sum(1 for h in d[1] if 0 == h[1]) for d in recorder]
-    elif y == 'abandon':
-        y_data = [len(d[1]) for d in recorder]
-    else:
-        return
-
-    max_value = []
-    for d in recorder:
-        max_comb = get_max_combinations(d[0])
-        max_v = sum([evaluate_artifact(a) for a in max_comb.values()])
-        max_value.append(max_v)
     area = (np.array(max_value) - 20)**2
     colors = np.random.rand(len(recorder))
 
@@ -178,37 +269,39 @@ def view_scatter_plot(recorder: List[Tuple[List, List]], x: str = 'finish', y: s
 def view_hist_plot(recorder: List[Tuple[List, List]], x: str = 'value'):
     '''
     plot the histogram of the data, x-axis is x\n
-    \trecoder: List[Tuple[List, List]] = a list that contain [(artifact_finish, artifact_abandon)]\n
-    \tx = ['finish'|'half'|'init'|'abandon']\n
-    finish: the artifact that finish upgrade\n
-    half: the artifact that is abandoned halfway\n
-    init: the artifact that is initially abandoned\n
-    abandon: the artifact that is abandoned\n
-    value: the value of max-value artifact combination using evaluate_artifact()
+    \t\trecoder: List[Tuple[List, List]] = a list that contain [(artifact_finish, artifact_abandon)]\n
+    \t\tx = ['finish'|'half'|'init'|'abandon'|'value'|'complete'|'last']\n
+    \tfinish: the artifact that finish upgrade\n
+    \thalf: the artifact that is abandoned halfway\n
+    \tinit: the artifact that is initially abandoned\n
+    \tabandon: the artifact that is abandoned\n
+    \tvalue: the value of max-value artifact combination using evaluate_artifact()\n
+    \tcomplete: the time that complete rolling a 4-piece set\n
+    \tlast: the time that upgrade the last artifact\n
     '''
-    max_value = []
-    for d in recorder:
-        max_comb = get_max_combinations(d[0])
-        max_v = sum([evaluate_artifact(a) for a in max_comb.values()])
-        max_value.append(max_v)
+    if x == 'value':
+        max_value = get_data_from_recorder(recorder, x)
+        max_int = int(max(max_value))+1
+        min_int = int(min(max_value))
+        if len(max_value) >= 10000:
+            bins = np.arange(min_int, max_int+1, 0.25)
+        elif len(max_value) >= 1000:
+            bins = np.arange(min_int, max_int+1, 0.5)
+        else:
+            bins = np.arange(min_int, max_int+1, 1)
 
-    max_int = int(max(max_value))+1
-    min_int = int(min(max_value))
-    if len(max_value) >= 10000:
-        bins = np.arange(min_int, max_int+1, 0.25)
-    elif len(max_value) >= 1000:
-        bins = np.arange(min_int, max_int+1, 0.5)
+        fig, ax = plt.subplots()
+        n, b, pathes = ax.hist(max_value, bins, facecolor='tab:blue')
+        ax.set_xlim(min_int, max_int)
+        ax.set_xticks(np.arange(min_int, max_int+1, 1))
+        ax.set_xticks(bins, minor=True)
+        if n.max() < 25:
+            ax.set_yticks(np.arange(0, n.max()+1, 1))
     else:
-        bins = np.arange(min_int, max_int+1, 1)
-
-    fig, ax = plt.subplots()
-    n, b, pathes = ax.hist(max_value, bins, facecolor='tab:blue')
-    ax.set_xlim(min_int, max_int)
-    ax.set_xticks(np.arange(min_int, max_int+1, 1))
-    ax.set_xticks(bins, minor=True)
+        y = get_data_from_recorder(recorder, x)
+        fig, ax = plt.subplots()
+        ax.hist(y, 20, facecolor='tab:blue')
     ax.set_xlabel(x)
-    if n.max() < 25:
-        ax.set_yticks(np.arange(0, n.max()+1, 1))
     ax.set_ylabel('number')
     ax.set_title('histogram for {}'.format(x))
     ax.xaxis.grid(color='dimgrey', alpha=0.9, which='both')
@@ -216,23 +309,30 @@ def view_hist_plot(recorder: List[Tuple[List, List]], x: str = 'value'):
     plt.show()
 
 
-def view_scatter_hist():
-    return
-
-
 def view_box_plot(recorder: List[Tuple[List, List]]):
     '''draw boxplot from the data of recorder'''
     finish_vector = [len(d[0]) for d in recorder]
     ab_vector = [len(d[1]) for d in recorder]
     half_ab_vector = [sum(1 for h in d[1] if 0 < h[1] < 5) for d in recorder]
-    # init_ab_vector = [sum(1 for h in d[1] if 0 == h[1]) for d in recorder]
     max_value = []
+    complete_set = []
+    last_vector = []
     for d in recorder:
         max_comb = get_max_combinations(d[0])
         max_v = sum([evaluate_artifact(a) for a in max_comb.values()])
         max_value.append(max_v)
+        for index in range(len(d[0])):
+            result_artifact = get_max_combinations(d[0][:index+1])
+            if all(result_artifact.values()):
+                complete_set.append(d[0][index][0])
+                break
+            if index == len(d[0])-1:
+                complete_set.append(d[0][-1][0])
+                break
+        last_vector.append(d[0][-1][0])
 
-    fig, (ax0, ax1, ax2, ax3) = plt.subplots(nrows=1, ncols=4, figsize=(9, 4))
+    fig, ((ax0, ax1, ax2),
+          (ax4, ax5, ax6)) = plt.subplots(nrows=2, ncols=3, figsize=(9, 4))
     bp0 = ax0.boxplot(finish_vector,
                       vert=True,
                       patch_artist=True,
@@ -245,14 +345,24 @@ def view_box_plot(recorder: List[Tuple[List, List]]):
                       vert=True,
                       patch_artist=True,
                       labels=['half abandon'])
-    bp3 = ax3.boxplot(max_value,
+    bp4 = ax4.boxplot(max_value,
                       vert=True,
                       patch_artist=True,
                       labels=['value'])
-    colors = ['pink', 'aquamarine', 'lightblue', 'lightgreen']
-    for bp, c in zip((bp0, bp1, bp2, bp3), colors):
+    bp5 = ax5.boxplot(complete_set,
+                      vert=True,
+                      patch_artist=True,
+                      labels=['complete time'])
+    bp6 = ax6.boxplot(last_vector,
+                      vert=True,
+                      patch_artist=True,
+                      labels=['end time'])
+    colors = ['lightblue', 'aquamarine', 'steelblue',
+              'pink', 'lightgreen', 'gold']
+    for bp, c in zip((bp0, bp1, bp2, bp4, bp5, bp6), colors):
         for patch in bp['boxes']:
             patch.set_facecolor(c)
+    plt.tight_layout()
     plt.show()
 
 
@@ -264,7 +374,7 @@ if __name__ == '__main__':
     sim = ArtClassifier()
     sim.set_main_stat(dict(zip(['flower', 'plume', 'sands', 'goblet', 'circlet'],
                                ['HP', 'ATK', 'ER', 'ELECTRO_DMG', 'CR'])))
-    sim.set_stat_criterion(['CD', 'CR', 'ATK_P'])
+    sim.set_target_stat(['CD', 'CR', 'ATK_P'])
     sim.set_stop_criterion(stopping)
     # sim.set_stop_criterion(no_stop)
     sim.w_data_input('./data/optimal_w.json')
@@ -277,7 +387,7 @@ if __name__ == '__main__':
 
     recorder = []
     sim.clear_result()
-    for i in range(1000):
+    for i in range(200):
         sim.start_simulation(3000)
         recorder.append((sim.artifact_finish.copy(),
                         sim.artifact_abandon.copy()))
@@ -286,3 +396,5 @@ if __name__ == '__main__':
     view_box_plot(recorder)
     view_hist_plot(recorder)
     view_scatter_plot(recorder)
+    view_value_growth(recorder, 3000)
+    view_stack_plot(recorder, 3000, sim.target_stat)

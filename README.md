@@ -200,10 +200,220 @@ $f(a)=w^Ta$
 
 > (figure9) 简化模型
 
-#### 本项目模型
+#### 项目模型
 
 项目使用的模型在简化模型的基础上做出如下优化：
 
 1. 对每一级强化，每一个位置，使用不同的分类器进行判断
 2. 明确圣遗物仓库中最优组合的定义
 3. 使用线性函数规定退出条件
+
+![项目模型](./doc/graph/model.jpg)
+
+> (figure10) 项目模型
+
+主要存在问题：``
+
+1. 分类器可能会随圣遗物仓库等因素的变化而变化
+
+### 项目实现
+
+#### 表示圣遗物的类-Art
+
+##### 属性
+
+```python
+self.'ATK', 'ATK_P', 'DEF', 'DEF_P', 'HP', 'HP_P', 'ER', 'EM', 'CR', 'CD' 
+各个副词条的值
+self.pos 位置
+self.sets 套装
+self.main 主词条
+```
+
+##### 初始化
+
+```python
+def generate(self, main: str, sets: int,  pos: str):
+传入位置，套装等信息进行初始化
+```
+
+##### 强化
+
+```python
+def upgrade(self):
+若为3词条，则继续按权值抽取第4个词条
+若为4词条，则在已有词条中平权抽取强化词条
+```
+
+##### 转换
+
+```python
+def __repr__(self) -> str:
+转化为字符串
+
+def chinese_output(self) -> str:
+转化为中文字符串
+
+def to_list(self) -> List[int]:
+转化为列表
+
+def to_array(self) -> np.array:
+转化为numpy.array
+```
+
+#### 表示强化过程的类-ArtClassifier
+
+##### 属性
+
+```python
+self.artifact_finish: Sequence[Tuple[int, Art]] 
+完成强化的圣遗物，Tuple[0]为时间
+
+self.artifact_abandon: Sequence[Tuple[int, int, Art]]
+未完成强化的圣遗物，Tuple[0]为时间，Tuple[1]为实际强化次数
+
+self.training_data: Mapping[str, Mapping[str, Sequence[Sequence[int]]]]
+训练分类器所用数据
+
+self.w: Dict[str, Sequence]
+分类器
+
+self.main_stat: Dict[str, str]
+主词条，键为位置，值为主词条
+
+self.target_stat: Sequence[str]
+所关心的副词条
+
+self.stop_criterion: Callable
+退出条件
+
+self.output_mode: bool
+输出模式开关
+```
+
+##### 初始设定
+
+```python
+def set_main_stat(self, main_stat: Mapping[str, str]):
+传入主词条字典，设定主词条
+
+def set_target_stat(self, target: Sequence[str]):
+传入副词条列表，设定关心的副词条
+
+def set_stop_criterion(self, f: Callable[[Any], bool]):
+传入退出条件函数，设定退出条件
+输入类型是numpy.array，判断过程为进行矢量内积(或自定义线性函数)，输出一个bool
+
+def set_output(self, flag: bool = True):
+设定输出模式，为True会输出模拟的详细过程
+
+def train_data_input(self, path):
+传入训练数据
+
+def w_data_input(self, path):
+传入w的数据
+```
+
+##### 训练与训练输出
+
+```python
+def train(self, train_data: Sequence[Sequence[int]]):
+使用logistic regression训练分类器
+
+def start_training(self):
+training_data设定好后便可以开始训练
+
+def w_data_input(self, path):
+将训练好的w输出到json中
+```
+
+##### 遴选最优组合
+
+```python
+def get_max_combinations(self) -> Dict[str, Any]:
+
+实现逻辑:
+分别从仓库中各个位置选出value最大的套装为0的圣遗物和套装为1的圣遗物，若没有则为None
+其中value由内置函数evaluate_artifact(Art)->float决定
+优先选择套装为0的圣遗物
+若选完后总选中件数<5:
+    在剩下的位置中选择使value提升最大的套装为1的圣遗物
+若选完后总选中件数==5:
+    若有使value提升最大的套装为1的圣遗物则选中
+```
+
+##### 模拟
+
+```python
+def sample_generation(self) -> Art:
+随机生成位置，由此按权值抽取主词条
+并随机生成一个圣遗物
+
+def start_simulation(self, max_times: int = 1000):
+进行好设置之后开始模拟，max_times为单次模拟中抽取次数上限
+结果保存在self.artifact_finish，self.artifact_abandon中
+
+def clear_result(self):
+清空储存，以便进行下一次模拟
+```
+
+#### 可视化
+
+`注意：value由函数evaluate_artifact(Art)->float决定`
+
+##### 对单次模拟的可视化
+
+```python
+def view_stack_plot_for_one(sim: ArtClassifier):
+传入一次模拟的结果
+输出堆栈图(figure11)
+其中y值表示对应词条的数量
+
+def view_step_plot_for_one(sim: ArtClassifier):
+传入一次模拟的结果
+输出台阶图(figure12)
+其中台阶线表示过程中value的增长情况，
+散点表示仓库中新加入的圣遗物，
+散点大小表示这个圣遗物的有效词条，
+红色表示次数没有形成4件套，绿色表示此时形成了4件套
+```
+
+##### 对多次模拟的可视化
+
+```python
+#定义
+recorder: List[Tuple[List, List]]
+包含一串(artifact_finish, artifact_abandon)的列表
+使用:
+recorder = []
+recorder.append((sim.artifact_finish.copy(), sim.artifact_abandon.copy()))
+生成
+
+def view_value_growth(recorder, length: int):
+传入多次模拟结果
+输出value的成长曲线(figure13)
+length不应大于模拟中的max_times
+
+def view_stack_plot(recorder, length: int, target_stat: List[str]):
+传入多次模拟结果
+输出经平均后的堆栈图(figure14)
+length不应大于模拟中的max_times
+target_stat可以使用sim.target_stat直接传入
+
+def view_scatter_plot(recorder, x: str = 'finish', y: str = 'abandon'):
+传入多次模拟结果
+输出关于x-y的散点图(figure15)
+x,y的可选值:
+['finish'|'half'|'init'|'abandon'|'value'|'complete'|'last']
+散点大小由最优组合的value确定
+
+def view_hist_plot(recorder, x: str = 'value'):
+传入多次模拟结果
+输出关于x的直方分布图(figure16)
+x的可选值:
+['finish'|'half'|'init'|'abandon'|'value'|'complete'|'last']
+
+def view_box_plot(recorder):
+传入多次模拟结果
+输出箱型图图(figure17)
+```

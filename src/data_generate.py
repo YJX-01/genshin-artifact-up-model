@@ -21,7 +21,6 @@ class DataGenerator(object):
                      'sands': {}, 'goblet': {}, 'circlet': {}}
         self.main_stat = {}
         self.target_stat = []
-        self.ignore_stat = []
         self.output_path = ''
         self.chinese = False
         self.tmp_data = []
@@ -50,8 +49,6 @@ class DataGenerator(object):
         \ttarget: List[str]
         '''
         self.target_stat = target
-        self.ignore_stat = [s for s in self.__subs
-                            if s not in self.target_stat]
 
     def output(self):
         with open(self.output_path, 'w') as f:

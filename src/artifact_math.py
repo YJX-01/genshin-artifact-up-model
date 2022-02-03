@@ -123,7 +123,7 @@ def table_for_WRS(occur: Dict[str, Dict[str, float]], title: str):
 
 
 def show_weight():
-    fig = plt.figure(figsize=(8, 5), dpi=300)
+    fig = plt.figure(figsize=(16, 5))
     gs = GridSpec(1, 2, width_ratios=[2, 1])
     ax1 = fig.add_subplot(gs[0])
     ax2 = fig.add_subplot(gs[1])
@@ -146,8 +146,9 @@ def show_weight():
               rowLabels=row1,
               colLabels=col1,
               cellLoc='center',
+              colWidths=[0.1]*5,
               loc='center',
-              fontsize=2)
+              fontsize='small')
 
     cell2 = [[str(__weight[k])] for k in __subs]
     ax2.set_axis_off()
@@ -156,8 +157,9 @@ def show_weight():
               rowLabels=__subs,
               colLabels=['weight'],
               cellLoc='center',
+              colWidths=[0.6],
               loc='center',
-              fontsize=2)
+              fontsize='small')
 
     plt.subplots_adjust(left=0.1, right=0.9, bottom=0.1)
     plt.show()
