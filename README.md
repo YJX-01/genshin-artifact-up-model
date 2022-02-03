@@ -216,11 +216,11 @@ $f(a)=w^Ta$
 
 1. 分类器可能会随圣遗物仓库等因素的变化而变化
 
-### 项目实现
+## 项目实现
 
-#### 表示圣遗物的类-Art
+### 表示圣遗物的类-Art
 
-##### 属性
+#### 属性
 
 ```python
 self.'ATK', 'ATK_P', 'DEF', 'DEF_P', 'HP', 'HP_P', 'ER', 'EM', 'CR', 'CD' 
@@ -230,14 +230,14 @@ self.sets 套装
 self.main 主词条
 ```
 
-##### 初始化
+#### 初始化
 
 ```python
 def generate(self, main: str, sets: int,  pos: str):
 传入位置，套装等信息进行初始化
 ```
 
-##### 强化
+#### 强化
 
 ```python
 def upgrade(self):
@@ -245,7 +245,7 @@ def upgrade(self):
 若为4词条，则在已有词条中平权抽取强化词条
 ```
 
-##### 转换
+#### 转换
 
 ```python
 def __repr__(self) -> str:
@@ -261,9 +261,9 @@ def to_array(self) -> np.array:
 转化为numpy.array
 ```
 
-#### 表示强化过程的类-ArtClassifier
+### 表示强化过程的类-ArtClassifier
 
-##### 属性
+#### 属性
 
 ```python
 self.artifact_finish: Sequence[Tuple[int, Art]] 
@@ -291,7 +291,7 @@ self.output_mode: bool
 输出模式开关
 ```
 
-##### 初始设定
+#### 初始设定
 
 ```python
 def set_main_stat(self, main_stat: Mapping[str, str]):
@@ -314,7 +314,7 @@ def w_data_input(self, path):
 传入w的数据
 ```
 
-##### 训练与训练输出
+#### 训练与训练输出
 
 ```python
 def train(self, train_data: Sequence[Sequence[int]]):
@@ -327,7 +327,7 @@ def w_data_input(self, path):
 将训练好的w输出到json中
 ```
 
-##### 遴选最优组合
+#### 遴选最优组合
 
 ```python
 def get_max_combinations(self) -> Dict[str, Any]:
@@ -342,7 +342,7 @@ def get_max_combinations(self) -> Dict[str, Any]:
     若有使value提升最大的套装为1的圣遗物则选中
 ```
 
-##### 模拟
+#### 模拟
 
 ```python
 def sample_generation(self) -> Art:
@@ -357,11 +357,11 @@ def clear_result(self):
 清空储存，以便进行下一次模拟
 ```
 
-#### 可视化
+### 可视化
 
 `注意：value由函数evaluate_artifact(Art)->float决定`
 
-##### 对单次模拟的可视化
+#### 对单次模拟的可视化
 
 ```python
 def view_stack_plot_for_one(sim: ArtClassifier):
@@ -378,7 +378,7 @@ def view_step_plot_for_one(sim: ArtClassifier):
 红色表示次数没有形成4件套，绿色表示此时形成了4件套
 ```
 
-##### 对多次模拟的可视化
+#### 对多次模拟的可视化
 
 ```python
 #定义
@@ -416,4 +416,20 @@ x的可选值:
 def view_box_plot(recorder):
 传入多次模拟结果
 输出箱型图图(figure17)
+```
+
+### 生成训练数据
+
+```python
+如下完成初始化
+实例
+    data_generator = DataGenerator()
+    data_generator.set_output_path('./data/training_data1.json')
+    data_generator.set_main_stat(dict(zip(['flower', 'plume', 'sands', 'goblet', 'circlet'],
+                                          ['HP', 'ATK', 'ER', 'ELECTRO_DMG', 'CR'])))
+    data_generator.set_target_stat(['CD', 'CR', 'ATK_P'])
+    data_generator.set_chinese()
+    data_generator.start_generate()
+
+接着按提示输入即可
 ```

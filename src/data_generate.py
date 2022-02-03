@@ -8,19 +8,15 @@ from classifier import Art
 class DataGenerator(object):
     __subs = ['ATK', 'ATK_P', 'DEF', 'DEF_P',
               'HP', 'HP_P', 'ER', 'EM', 'CR', 'CD']
-    
+
     __positions = ['flower', 'plume', 'sands', 'goblet', 'circlet']
-
-
-    with open('./doc/distribution.json', 'r') as f:
-        js = json.load(f)
-        __distribution_sub: Mapping[str, int] = js['sub']
 
     def __init__(self):
         self.data = {'flower': {}, 'plume': {},
                      'sands': {}, 'goblet': {}, 'circlet': {}}
         self.main_stat = {}
         self.target_stat = []
+        self.ignore_stat = []
         self.output_path = ''
         self.chinese = False
         self.tmp_data = []
@@ -43,12 +39,14 @@ class DataGenerator(object):
         '''
         self.main_stat = main_stat
 
-    def set_stat_criterion(self, target: Sequence[str]):
+    def set_target_stat(self, target: Sequence[str]):
         '''
         set target sub stat\n
         \ttarget: List[str]
         '''
         self.target_stat = target
+        self.ignore_stat = [s for s in self.__subs
+                            if s not in target]
 
     def output(self):
         with open(self.output_path, 'w') as f:
@@ -62,13 +60,13 @@ class DataGenerator(object):
         else:
             print('\n', a)
         print(f'\n\tstat num = <{stat_num}>, target stat num = <{value_num}>\n',
-              'exit this circulation(e);\n already done this part(a);\n save data and break(s);\n',
+              'exit this circulation(e);\n already done this part(a);\n save data and break(s);\n pass(p);\n',
               'Will you choose to upgrade this? yes/no (y/n) ',
               end='->')
 
         choose_option = ''
 
-        if random_omission:
+        if random_omission > 0:
             random_omission -= 1
             print('<omit>')
         else:
@@ -177,9 +175,9 @@ class DataGenerator(object):
 
 if __name__ == '__main__':
     data_generator = DataGenerator()
-    data_generator.set_output_path('./data/training_data1.json')
+    data_generator.set_output_path('./data/training_data.json')
     data_generator.set_main_stat(dict(zip(['flower', 'plume', 'sands', 'goblet', 'circlet'],
                                           ['HP', 'ATK', 'ER', 'ELECTRO_DMG', 'CR'])))
-    data_generator.set_stat_criterion(['CD', 'CR', 'ATK_P'])
+    data_generator.set_target_stat(['CD', 'CR', 'ATK_P'])
     data_generator.set_chinese()
     data_generator.start_generate()

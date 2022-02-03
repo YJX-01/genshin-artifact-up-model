@@ -413,13 +413,13 @@ if __name__ == '__main__':
     sim.set_output()
 
     # use data to train classifier
-    sim.train_data_input('./data/training_data1.json')
+    sim.train_data_input('./data/training_data.json')
     sim.start_training()
-    sim.w_data_output('./data/optimal_w_train.json')
+    sim.w_data_output('./data/optimal_w.json')
 
-    # # get classifier directly
+    # get classifier directly
     sim.w_data_input('./data/optimal_w.json')
 
-    for i in range(10):
+    for i in range(1):
         sim.start_simulation()
         sim.clear_result()

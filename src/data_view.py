@@ -387,8 +387,8 @@ if __name__ == '__main__':
 
     recorder = []
     sim.clear_result()
-    for i in range(200):
-        sim.start_simulation(3000)
+    for i in range(100):
+        sim.start_simulation(5000)
         recorder.append((sim.artifact_finish.copy(),
                         sim.artifact_abandon.copy()))
         sim.clear_result()
