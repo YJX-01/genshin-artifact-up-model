@@ -200,9 +200,9 @@ $f(a)=w^Ta$
 
 > (figure9) 简化模型
 
-#### 项目模型
+#### 分类器模型
 
-项目使用的模型在简化模型的基础上做出如下优化：
+分类器模型在简化模型的基础上做出如下优化：
 
 1. 对每一级强化，每一个位置，使用不同的分类器进行判断
 2. 明确圣遗物仓库中最优组合的定义
@@ -212,9 +212,10 @@ $f(a)=w^Ta$
 
 > (figure10) 项目模型
 
-主要存在问题：``
+主要存在问题：
 
 1. 分类器可能会随圣遗物仓库等因素的变化而变化
+2. 分类器训练需要海量数据，难以人力实现
 
 ## 项目实现
 
@@ -251,13 +252,16 @@ def upgrade(self):
 def __repr__(self) -> str:
 转化为字符串
 
-def chinese_output(self) -> str:
+@property
+def chinese(self) -> str:
 转化为中文字符串
 
-def to_list(self) -> List[int]:
+@property
+def list(self) -> List[int]:
 转化为列表
 
-def to_array(self) -> np.array:
+@property
+def array(self) -> np.array:
 转化为numpy.array
 ```
 
@@ -272,11 +276,8 @@ self.artifact_finish: Sequence[Tuple[int, Art]]
 self.artifact_abandon: Sequence[Tuple[int, int, Art]]
 未完成强化的圣遗物，Tuple[0]为时间，Tuple[1]为实际强化次数
 
-self.training_data: Mapping[str, Mapping[str, Sequence[Sequence[int]]]]
-训练分类器所用数据
-
-self.w: Dict[str, Sequence]
-分类器
+self.p: ArtPossibility
+鉴定概率是否达到阈值
 
 self.main_stat: Dict[str, str]
 主词条，键为位置，值为主词条
@@ -294,42 +295,34 @@ self.output_mode: bool
 #### 初始设定
 
 ```python
-def set_main_stat(self, main_stat: Mapping[str, str]):
+main_stat: Mapping[str, str]
 传入主词条字典，设定主词条
 
-def set_target_stat(self, target: Sequence[str]):
+target_stat: Sequence[str]
 传入副词条列表，设定关心的副词条
 
-def set_stop_criterion(self, f: Callable[[Any], bool]):
+stop_criterion: Callable[[Any], bool]
 传入退出条件函数，设定退出条件
 输入类型是numpy.array，判断过程为进行矢量内积(或自定义线性函数)，输出一个bool
 
-def set_output(self, flag: bool = True):
+output_mode: bool
 设定输出模式，为True会输出模拟的详细过程
 
-def train_data_input(self, path):
-传入训练数据
+threshold: Mapping[str, float]
+各个位置value的阈值
 
-def w_data_input(self, path):
-传入w的数据
-```
-
-#### 训练与训练输出
-
-```python
-def train(self, train_data: Sequence[Sequence[int]]):
-使用logistic regression训练分类器
-
-def start_training(self):
-training_data设定好后便可以开始训练
-
-def w_data_input(self, path):
-将训练好的w输出到json中
+上述属性设定好后，使用
+def initialize():
+进行self.p的初始化和其他初始化
 ```
 
 #### 遴选最优组合
 
 ```python
+@staticmethod
+def evaluate_artifact(a: Art, value_vector: Sequence[float]) -> float:
+静态函数用于计算圣遗物的value
+
 def get_max_combinations(self) -> Dict[str, Any]:
 
 实现逻辑:
@@ -348,16 +341,90 @@ def get_max_combinations(self) -> Dict[str, Any]:
 def sample_generation(self) -> Art:
 随机生成位置，由此按权值抽取主词条
 并随机生成一个圣遗物
+使用算法：Algorithm A With a Reservoir(A-Res)
+(比直接choice稍有优化，因为n不大所以速度优势不能体现)
 
 def start_simulation(self, max_times: int = 1000):
 进行好设置之后开始模拟，max_times为单次模拟中抽取次数上限
+中途会在某位置有对应圣遗物后上调对应容忍等级
 结果保存在self.artifact_finish，self.artifact_abandon中
 
 def clear_result(self):
 清空储存，以便进行下一次模拟
+重置self.p.tolerance
 ```
 
-### 可视化
+### 计算成功概率的类-ArtPossibility
+
+#### 属性
+
+```python
+self.main_stat: Dict[str, str]
+主词条
+
+self.evaluate: Callable[[Any], float]
+用于确定圣遗物value的函数
+
+self.threshold: Dict[str, float]
+不同位置的value的阈值
+
+self.tolerance: Dict[str, int]
+容忍度等级，分为0，1，2，3级
+
+self.tolerance_p: Dict[str, Dict[str, Dict[str, Dict[int, float]]]]
+# tolerance_p[pos][len][up][tolerance_lv] = p
+不同容忍等级下圣遗物应具有的最小成功概率
+
+self.possibilities: Dict[str, Dict[str, Dict[str, Dict[tuple, float]]]]
+# possibilities[pos][len][up][tuple] = p
+不同圣遗物成功达到阈值的概率
+```
+
+#### 访问
+
+```python
+def get_p(self, art: Art):
+# 通过圣遗物实例访问成功概率
+    return self.possibilities[art.pos][len(art)][art.upgrade_time].get(tuple(art.list))
+
+def get_t(self, art: Art):
+# 通过圣遗物实例访问对应容忍度下的最小成功概率
+    return self.tolerance_p[art.pos][len(art)][art.upgrade_time].get(self.tolerance[art.pos])
+```
+
+#### 数据生成
+
+```python
+def recursive_possibilities(self, art: Art) -> float:
+递归地对有4词条以上的圣遗物计算达到阈值的成功概率
+
+def generate_possibilities(self, position: str):
+计算某部位所有圣遗物组合的成功概率
+使用算法：枚举
+注意：引入强化次数，4词条0强化与4词条1强化不同
+注意：3词条圣遗物要按权值抽取词条后再递归计算
+
+def generate_tolerance(self, position):
+计算不同容忍度下的最小成功概率
+使用算法：排序
+对某位置，某总词条数，某强化次数，某容忍等级
+计算概率函数(累计概率的函数)
+找到0.5分位数，0.6分位数，0.7分位数和0.8分位数，分别赋予0，1，2，3级
+```
+
+#### 初始化及使用
+
+```python
+def initialize(self)：
+需要输入self.threshold，self.main_stat，self.evaluate
+后进行初始化
+
+def judge(self, art: Art) -> bool:
+输入圣遗物实例
+输出对其是否到达容忍的成功概率的判断结果
+```
+
+### 可视化-data_view
 
 `注意：value由函数evaluate_artifact(Art)->float决定`
 
@@ -366,12 +433,12 @@ def clear_result(self):
 ```python
 def view_stack_plot_for_one(sim: ArtClassifier):
 传入一次模拟的结果
-输出堆栈图(figure11)
+输出堆栈图#(figure2.1)
 其中y值表示对应词条的数量
 
 def view_step_plot_for_one(sim: ArtClassifier):
 传入一次模拟的结果
-输出台阶图(figure12)
+输出台阶图#(figure2.2)
 其中台阶线表示过程中value的增长情况，
 散点表示仓库中新加入的圣遗物，
 散点大小表示这个圣遗物的有效词条，
@@ -391,45 +458,29 @@ recorder.append((sim.artifact_finish.copy(), sim.artifact_abandon.copy()))
 
 def view_value_growth(recorder, length: int):
 传入多次模拟结果
-输出value的成长曲线(figure13)
+输出value的成长曲线#(figure2.3)
 length不应大于模拟中的max_times
 
 def view_stack_plot(recorder, length: int, target_stat: List[str]):
 传入多次模拟结果
-输出经平均后的堆栈图(figure14)
+输出经平均后的堆栈图#(figure2.4)
 length不应大于模拟中的max_times
 target_stat可以使用sim.target_stat直接传入
 
 def view_scatter_plot(recorder, x: str = 'finish', y: str = 'abandon'):
 传入多次模拟结果
-输出关于x-y的散点图(figure15)
+输出关于x-y的散点图#(figure2.5)
 x,y的可选值:
 ['finish'|'half'|'init'|'abandon'|'value'|'complete'|'last']
 散点大小由最优组合的value确定
 
 def view_hist_plot(recorder, x: str = 'value'):
 传入多次模拟结果
-输出关于x的直方分布图(figure16)
+输出关于x的直方分布图#(figure2.6)
 x的可选值:
 ['finish'|'half'|'init'|'abandon'|'value'|'complete'|'last']
 
 def view_box_plot(recorder):
 传入多次模拟结果
-输出箱型图图(figure17)
-```
-
-### 生成训练数据
-
-```python
-如下完成初始化
-实例
-    data_generator = DataGenerator()
-    data_generator.set_output_path('./data/training_data1.json')
-    data_generator.set_main_stat(dict(zip(['flower', 'plume', 'sands', 'goblet', 'circlet'],
-                                          ['HP', 'ATK', 'ER', 'ELECTRO_DMG', 'CR'])))
-    data_generator.set_target_stat(['CD', 'CR', 'ATK_P'])
-    data_generator.set_chinese()
-    data_generator.start_generate()
-
-接着按提示输入即可
+输出箱型图图#(figure2.7)
 ```

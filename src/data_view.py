@@ -1,19 +1,16 @@
-from typing import Dict, List
+from typing import Dict, List, Tuple
 import numpy as np
 import matplotlib.pyplot as plt
-from classifier import *
+from artsim import ArtSimulation
+from art import Art
 
 __subs = ['ATK', 'ATK_P', 'DEF', 'DEF_P',
           'HP', 'HP_P', 'ER', 'EM', 'CR', 'CD']
 __positions = ['flower', 'plume', 'sands', 'goblet', 'circlet']
 
 
-def evaluate_artifact(a: Art) -> float:
-    if not a:
-        return 0
-    v_a = a.to_list()
-    v_w = [0.2, 0.6, 0, 0, 0, 0, 0.1, 0, 1, 1]
-    return sum(map(lambda x, y: x*y, v_w, v_a))
+def evaluate_artifact(a: Art, value_vector=[0.2, 0.6, 0, 0, 0, 0, 0.4, 0, 1, 1]) -> float:
+    return sum(map(lambda x, y: x*y, value_vector, a.list)) if a else 0
 
 
 def get_max_combinations(artifact_finish: List[Tuple]):
@@ -48,7 +45,7 @@ def get_max_combinations(artifact_finish: List[Tuple]):
     return result_artifact
 
 
-def get_data_from_recorder(recorder: List[Tuple[List, List]], data_name: str):
+def get_data_from_recorder(recorder, data_name: str):
     '''
     data_name choice:\n
     \tfinish: the artifact that finish upgrade\n
@@ -92,7 +89,7 @@ def get_data_from_recorder(recorder: List[Tuple[List, List]], data_name: str):
         return
 
 
-def view_stack_plot_for_one(sim: ArtClassifier):
+def view_stack_plot_for_one(sim: ArtSimulation):
     if not sim.artifact_finish:
         return
 
@@ -127,7 +124,7 @@ def view_stack_plot_for_one(sim: ArtClassifier):
     plt.show()
 
 
-def view_step_plot_for_one(sim: ArtClassifier):
+def view_step_plot_for_one(sim: ArtSimulation):
     if not sim.artifact_finish:
         return
 
@@ -366,29 +363,37 @@ def view_box_plot(recorder: List[Tuple[List, List]]):
     plt.show()
 
 
+def stop(array):
+    value_vector = np.array([0, 1, 0, 0, 0, 0, 0, 0, 1, 1])
+    flag = np.matmul(array, value_vector) >= 24
+    value_vector2 = np.array([0, 0, 0, 0, 0, 0, 0, 0, 1, 1])
+    flag2 = np.matmul(array, value_vector2) >= 18
+    return flag and flag2
+
+
 def no_stop(*args):
     return False
 
 
 if __name__ == '__main__':
-    sim = ArtClassifier()
-    sim.set_main_stat(dict(zip(['flower', 'plume', 'sands', 'goblet', 'circlet'],
-                               ['HP', 'ATK', 'ER', 'ELECTRO_DMG', 'CR'])))
-    sim.set_target_stat(['CD', 'CR', 'ATK_P'])
-    sim.set_stop_criterion(stopping)
-    # sim.set_stop_criterion(no_stop)
-    sim.w_data_input('./data/optimal_w.json')
+    sim = ArtSimulation()
+    sim.main_stat = dict(zip(['flower', 'plume', 'sands', 'goblet', 'circlet'],
+                             ['HP', 'ATK', 'ER', 'ELECTRO_DMG', 'CR']))
+    sim.threshold = dict(zip(['flower', 'plume', 'sands', 'goblet', 'circlet'],
+                             [4, 4, 3, 3, 2]))
+    sim.target_stat = ['CD', 'CR', 'ATK_P']
+    sim.stop_criterion = stop
+    # sim.stop_criterion = no_stop
+    sim.initialize()
 
-    sim.set_output(False)
-
-    sim.start_simulation(5000)
+    sim.start_simulation(3000)
     view_step_plot_for_one(sim)
     view_stack_plot_for_one(sim)
 
     recorder = []
     sim.clear_result()
-    for i in range(100):
-        sim.start_simulation(5000)
+    for i in range(1000):
+        sim.start_simulation(3000)
         recorder.append((sim.artifact_finish.copy(),
                         sim.artifact_abandon.copy()))
         sim.clear_result()
