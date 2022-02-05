@@ -287,7 +287,7 @@ def array(self) -> np.array:
 转化为numpy.array
 ```
 
-### 表示强化过程的类-ArtClassifier
+### 表示强化过程的类-ArtSimulation
 
 #### 属性
 
@@ -453,12 +453,12 @@ def judge(self, art: Art) -> bool:
 #### 对单次模拟的可视化
 
 ```python
-def view_stack_plot_for_one(sim: ArtClassifier):
+def view_stack_plot_for_one(sim: ArtSimulation):
 传入一次模拟的结果
 输出堆栈图#(figure2.1)
 其中y值表示对应词条的数量
 
-def view_step_plot_for_one(sim: ArtClassifier):
+def view_step_plot_for_one(sim: ArtSimulation):
 传入一次模拟的结果
 输出台阶图#(figure2.2)
 其中台阶线表示过程中value的增长情况，
@@ -534,3 +534,34 @@ def view_box_plot(recorder):
 ![figure2.7](./doc/graph/Figure_2_7.jpg)
 
 > figure2.7
+
+## 应用实例
+
+实例：以雷神为例，设置如下
+
+```
+主词条（main_stat）
+沙：充能
+杯：雷伤
+冠：暴击率
+
+副词条（target_stat）
+攻击，暴击率，暴击伤害
+
+评价标准（evaluate_artifact）
+value=小攻击*0.2+攻击*0.6+充能*0.4+暴击率*1+暴击伤害*1
+
+阈值（threshold）
+花羽：4
+沙杯：3
+冠：2
+
+退出条件（stop_criterion）
+双爆>=18 and 攻双爆>=24
+```
+
+导出结果在./doc/samplegraph下
+
+同时，见文章
+
+[](https://)
