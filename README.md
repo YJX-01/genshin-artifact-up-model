@@ -1,8 +1,8 @@
 # genshin-artifact-up-model
 
-A well-visualized Genshin Impact artifact upgrade model with classifier (decide whether to upgrade or not)
+A rational and well-visualized Genshin Impact artifact upgrade model
 
-原神圣遗物强化模型，使用二元分类器决策是否升级，拥有多种可视化方案
+原神圣遗物强化模型，对每次强化计算达阈值概率以决策是否升级，拥有多种可视化方案
 
 ## 前言(preface)
 
@@ -169,7 +169,7 @@ matplotlib
 
 在一般讨论中，我们常用**线性函数**表示圣遗物的价值，并对超过阈值的圣遗物进行强化
 
-因此在强化中使用**二元分类器**判断是否进行强化是合理且有效的
+因此在强化中使用**二元分类器**判断是否进行强化是有效的
 
 令分类器为w，圣遗物为a，副词条有10种，添加一个常数项，使其变为11维矢量
 
@@ -208,14 +208,35 @@ $f(a)=w^Ta$
 2. 明确圣遗物仓库中最优组合的定义
 3. 使用线性函数规定退出条件
 
-![项目模型](./doc/graph/model.jpg)
+![分类器模型](./doc/graph/classify_model.jpg)
 
-> (figure10) 项目模型
+> (figure10) 分类器模型
 
 主要存在问题：
 
 1. 分类器可能会随圣遗物仓库等因素的变化而变化
 2. 分类器训练需要海量数据，难以人力实现
+
+#### 成功概率模型
+
+一种更加理性的决策是计算圣遗物达到预期的概率后再决定是否强化
+
+（直觉上这比单单使用分类器更加理性，因为分类器很容易漏选或多选。这一猜想未经证明）
+
+模型过程：
+
+1. 对每种情况都计算达阈值的概率（成功概率）
+2. 对不同位置，在计算成功概率后，对某种条件下的所有情况，对其进行排序，计算累积概率函数
+3. 设定容忍度等级，通过容忍度等级确定某种累积概率函数的分位数
+4. 确定成功概率和容忍度的对应分位数后，对每次强化，查找成功概率和分位数，当成功概率大于分位数时进行强化
+
+缺点：
+
+1. 容忍度等级会随圣遗物仓库等因素的变化而变化（实现上可行，但囿于python性能限制，实现后会拖慢模拟速度）
+
+![成功概率模型](./doc/graph/pos_model.jpg)
+
+> (figure11) 成功概率模型
 
 ## 项目实现
 
@@ -225,10 +246,11 @@ $f(a)=w^Ta$
 
 ```python
 self.'ATK', 'ATK_P', 'DEF', 'DEF_P', 'HP', 'HP_P', 'ER', 'EM', 'CR', 'CD' 
-各个副词条的值
+各个副词条的词条数
 self.pos 位置
 self.sets 套装
 self.main 主词条
+self.upgrade_time 强化次数
 ```
 
 #### 初始化
@@ -445,6 +467,14 @@ def view_step_plot_for_one(sim: ArtClassifier):
 红色表示次数没有形成4件套，绿色表示此时形成了4件套
 ```
 
+![figure2.1](./doc/graph/Figure_2_1.jpg)
+
+> figure2.1
+
+![figure2.2](./doc/graph/Figure_2_2.jpg)
+
+> figure2.2
+
 #### 对多次模拟的可视化
 
 ```python
@@ -484,3 +514,23 @@ def view_box_plot(recorder):
 传入多次模拟结果
 输出箱型图图#(figure2.7)
 ```
+
+![figure2.3](./doc/graph/Figure_2_3.jpg)
+
+> figure2.3
+
+![figure2.4](./doc/graph/Figure_2_4.jpg)
+
+> figure2.4
+
+![figure2.5](./doc/graph/Figure_2_5.jpg)
+
+> figure2.5
+
+![figure2.6](./doc/graph/Figure_2_6.jpg)
+
+> figure2.6
+
+![figure2.7](./doc/graph/Figure_2_7.jpg)
+
+> figure2.7

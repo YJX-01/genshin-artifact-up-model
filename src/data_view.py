@@ -329,36 +329,45 @@ def view_box_plot(recorder: List[Tuple[List, List]]):
         last_vector.append(d[0][-1][0])
 
     fig, ((ax0, ax1, ax2),
-          (ax4, ax5, ax6)) = plt.subplots(nrows=2, ncols=3, figsize=(9, 4))
+          (ax4, ax5, ax6)) = plt.subplots(nrows=2, ncols=3, figsize=(12, 6))
     bp0 = ax0.boxplot(finish_vector,
+                      sym='',
                       vert=True,
                       patch_artist=True,
                       labels=['finish'])
     bp1 = ax1.boxplot(ab_vector,
+                      sym='',
                       vert=True,
                       patch_artist=True,
                       labels=['abandon'])
     bp2 = ax2.boxplot(half_ab_vector,
+                      sym='',
                       vert=True,
                       patch_artist=True,
                       labels=['half abandon'])
     bp4 = ax4.boxplot(max_value,
+                      sym='',
                       vert=True,
                       patch_artist=True,
                       labels=['value'])
     bp5 = ax5.boxplot(complete_set,
+                      sym='',
                       vert=True,
                       patch_artist=True,
                       labels=['complete time'])
     bp6 = ax6.boxplot(last_vector,
+                      sym='',
                       vert=True,
                       patch_artist=True,
                       labels=['end time'])
     colors = ['lightblue', 'aquamarine', 'steelblue',
               'pink', 'lightgreen', 'gold']
+    for ax in (ax0, ax1, ax2, ax4, ax5, ax6):
+        ax.yaxis.grid(True)
     for bp, c in zip((bp0, bp1, bp2, bp4, bp5, bp6), colors):
         for patch in bp['boxes']:
             patch.set_facecolor(c)
+    plt.grid(True, axis='y')
     plt.tight_layout()
     plt.show()
 
