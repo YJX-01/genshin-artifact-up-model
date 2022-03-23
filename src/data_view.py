@@ -4,16 +4,19 @@ import matplotlib.pyplot as plt
 from artsim import ArtSimulation
 from art import Art
 
-__subs = ['ATK', 'ATK_P', 'DEF', 'DEF_P',
-          'HP', 'HP_P', 'ER', 'EM', 'CR', 'CD']
-__positions = ['flower', 'plume', 'sands', 'goblet', 'circlet']
+__subs = ['ATK_PER', 'ATK_CONST',
+          'DEF_PER', 'DEF_CONST',
+          'HP_PER', 'HP_CONST',
+          'EM', 'ER',
+          'CRIT_RATE', 'CRIT_DMG']
+__positions = ['FLOWER', 'PLUME', 'SANDS', 'GOBLET', 'CIRCLET']
 
 
-def evaluate_artifact(a: Art, value_vector=[0.2, 0.6, 0, 0, 0, 0, 0.4, 0, 1, 1]) -> float:
+def evaluate_artifact(a: Art, value_vector=[0.6, 0.2, 0, 0, 0, 0, 0, 0.4, 1, 1]) -> float:
     return sum(map(lambda x, y: x*y, value_vector, a.list)) if a else 0
 
 
-def get_max_combinations(artifact_finish: List[Tuple]):
+def get_max_combinations(artifact_finish: List[Tuple]) -> Dict[str, Art]:
     def find_max_set1(stat_list: list, top_dict: dict) -> str:
         max_stat = ('', 0)
         for stat in stat_list:
@@ -27,11 +30,13 @@ def get_max_combinations(artifact_finish: List[Tuple]):
     for pos in __positions:
         top_for_each_set[pos] = [None, None]
     for tup in artifact_finish:
-        art = tup[1]
-        if art.sets == 0 and evaluate_artifact(art) > evaluate_artifact(top_for_each_set[art.pos][0]):
-            top_for_each_set[art.pos][0] = art
-        elif art.sets == 1 and evaluate_artifact(art) > evaluate_artifact(top_for_each_set[art.pos][1]):
-            top_for_each_set[art.pos][1] = art
+        art: Art = tup[1]
+        if art.set_type.value == 0 and \
+                evaluate_artifact(art) > evaluate_artifact(top_for_each_set[art.pos_type.name][0]):
+            top_for_each_set[art.pos_type.name][0] = art
+        elif art.set_type.value == 1 and \
+                evaluate_artifact(art) > evaluate_artifact(top_for_each_set[art.pos_type.name][1]):
+            top_for_each_set[art.pos_type.name][1] = art
     stat_list = []
     for s in __positions:
         if top_for_each_set[s][0]:
@@ -105,10 +110,10 @@ def view_stack_plot_for_one(sim: ArtSimulation):
         for a in result_artifact.values():
             if not a:
                 continue
-            for k, v in a.__dict__.items():
+            for k, v in a.sub_stat.items():
                 if k in sim.target_stat:
                     stack_data[k] += v
-                elif k in __subs:
+                else:
                     stack_data['OTHER'] += v
         for k, v in stack_data.items():
             y[k].append(v)
@@ -137,7 +142,7 @@ def view_step_plot_for_one(sim: ArtSimulation):
         result_artifact = get_max_combinations(sim.artifact_finish[:index+1])
         value = sum([evaluate_artifact(a) for a in result_artifact.values()])
         complete_flag = all(result_artifact.values())
-        stat_num = sum([v for k, v in sim.artifact_finish[index][1].__dict__.items()
+        stat_num = sum([v for k, v in sim.artifact_finish[index][1].sub_stat.items()
                         if k in sim.target_stat])
 
         if complete_flag:
@@ -207,10 +212,10 @@ def view_stack_plot(recorder: List[Tuple[List, List]], length: int, target_stat:
             for a in result_artifact.values():
                 if not a:
                     continue
-                for k, v in a.__dict__.items():
+                for k, v in a.sub_stat.items():
                     if k in target_stat:
                         stack_data[k] += v
-                    elif k in __subs:
+                    else:
                         stack_data['OTHER'] += v
             tmp_y[-1] = stack_data
         for _ in range(length-len(tmp_y)):
@@ -373,7 +378,7 @@ def view_box_plot(recorder: List[Tuple[List, List]]):
 
 
 def stop(array):
-    value_vector = np.array([0, 1, 0, 0, 0, 0, 0, 0, 1, 1])
+    value_vector = np.array([1, 0, 0, 0, 0, 0, 0, 0, 1, 1])
     flag = np.matmul(array, value_vector) >= 24
     value_vector2 = np.array([0, 0, 0, 0, 0, 0, 0, 0, 1, 1])
     flag2 = np.matmul(array, value_vector2) >= 18
@@ -386,23 +391,26 @@ def no_stop(*args):
 
 if __name__ == '__main__':
     sim = ArtSimulation()
-    sim.main_stat = dict(zip(['flower', 'plume', 'sands', 'goblet', 'circlet'],
-                             ['HP', 'ATK', 'ER', 'ELECTRO_DMG', 'CR']))
-    sim.threshold = dict(zip(['flower', 'plume', 'sands', 'goblet', 'circlet'],
-                             [4, 4, 3, 3, 2]))
-    sim.target_stat = ['CD', 'CR', 'ATK_P']
-    sim.stop_criterion = stop
-    # sim.stop_criterion = no_stop
+    sim.main_stat = dict(zip(['FLOWER', 'PLUME', 'SANDS', 'GOBLET', 'CIRCLET'],
+                             ['HP_CONST', 'ATK_CONST', 'ER', 'ELECTRO_DMG', 'CRIT_DMG']))
+    sim.threshold = dict(zip(['FLOWER', 'PLUME', 'SANDS', 'GOBLET', 'CIRCLET'],
+                             [5, 5, 3.5, 3.5, 3]))
+    sim.target_stat = ['CRIT_DMG', 'CRIT_RATE', 'ATK_PER']
+    sim.p.percent = 0.3
+    # sim.stop_criterion = stop
+    sim.stop_criterion = no_stop
+    sim.output_mode = True
     sim.initialize()
 
-    sim.start_simulation(3000)
+    sim.start_simulation(2000)
     view_step_plot_for_one(sim)
     view_stack_plot_for_one(sim)
+    sim.output_mode = False
 
     recorder = []
     sim.clear_result()
     for i in range(1000):
-        sim.start_simulation(3000)
+        sim.start_simulation(2000)
         recorder.append((sim.artifact_finish.copy(),
                         sim.artifact_abandon.copy()))
         sim.clear_result()
